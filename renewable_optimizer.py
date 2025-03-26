@@ -5,7 +5,7 @@ from scipy.optimize import minimize
 from scipy.special import gamma
 from sko.GA import GA
 from sko.PSO import PSO
-from gwwo import GWWOA, GWO, WOA, HS, FPA
+from gwwo import GWWOA, WOA, HS, FPA
 
 
 class RenewableOptimizer:
@@ -128,7 +128,7 @@ class RenewableOptimizer:
         )
         best_solution, fitness_history = gwwoa.optimize()
         return best_solution, fitness_history
-
+    
     def run_ga(self):
         """Genetic Algorithm implementation"""
         ga = GA(
@@ -180,19 +180,6 @@ class RenewableOptimizer:
             pso_history.append(pso.gbest_y)
             
         return pso.gbest_x, pso_history
-
-    def run_gwo(self):
-        """Grey Wolf Optimizer implementation"""
-        bounds = [[1, 2000]] + [[-0.5, 0.5]]*24
-        gwo = GWO(
-            obj_func=lambda x: self.energy_cost(x),
-            dim=25,
-            bounds=bounds,
-            population_size=self.pop_size,
-            max_iter=self.max_iter
-        )
-        best_solution, fitness_history = gwo.optimize()
-        return best_solution, fitness_history
 
     def run_woa(self):
         """Whale Optimization Algorithm implementation"""
@@ -284,18 +271,39 @@ def plot_convergence(results):
     plt.close()
 
 def plot_soc_comparison(results):
-    plt.figure(figsize=(14,8))
-    for algo, data in results.items():
+    algorithms = list(results.keys())
+    num_algorithms = len(algorithms)
+    
+    plt.figure(figsize=(14, 3*num_algorithms))  # Her algoritma için 3 birim yükseklik
+    
+    for idx, algo in enumerate(algorithms, 1):
+        plt.subplot(num_algorithms, 1, idx)  # n satır, 1 sütun, pozisyon idx
+        
+        data = results[algo]
         solutions = [s for s in data['solutions'] if s is not None]
+        
         if solutions:
-            soc = calculate_soc(solutions[-1])
-            plt.plot(soc, label=f'{algo} SOC')
-    plt.title('State of Charge Comparison')
-    plt.xlabel('Hour')
-    plt.ylabel('SOC (%)')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig('soc_comparison.png')
+            soc = calculate_soc(solutions[-1])  # Son başarılı çözümü al
+            plt.plot(soc, color='tab:blue', linewidth=2)
+            plt.fill_between(range(len(soc)), soc, alpha=0.2, color='tab:blue')
+            
+            # Grafik düzenlemeleri
+            plt.title(f'{algo} - State of Charge', fontsize=12, pad=10)
+            plt.xlabel('Hour', fontsize=10)
+            plt.ylabel('SOC (%)', fontsize=10)
+            plt.grid(True, linestyle='--', alpha=0.7)
+            plt.xticks(range(0, 24, 2))
+            plt.ylim(0, 1)
+            
+        else:
+            plt.text(0.5, 0.5, 'No Valid Solution', 
+                    ha='center', va='center', 
+                    transform=plt.gca().transAxes,
+                    color='red', fontsize=12)
+            plt.axis('off')
+    
+    plt.tight_layout(pad=3.0)
+    plt.savefig('soc_comparison_subplots.png', dpi=300, bbox_inches='tight')
     plt.close()
 
 def population_sensitivity():
@@ -408,7 +416,6 @@ def plot_mean_convergence(results, analysis):
 if __name__ == "__main__":
     algorithms = {
         "GWWOA": "run_gwwoa",
-        "GWO": "run_gwo",
         "WOA": "run_woa", 
         "CPSO": "run_pso",
         "HS": "run_hs",
@@ -419,10 +426,10 @@ if __name__ == "__main__":
     analysis = analyze_results(results)
     
     print("\n=== Final Performance Summary ===")
-    print(f"{'Algorithm':<10} {'Mean':<12} {'Std':<10} {'Min':<12} {'Max':<12} {'Success':<8}")
+    print(f"{'Algorithm':<10}\t{'Mean':<12}\t{'Std':<10}\t{'Min':<12}\t{'Max':<12}\t{'Success':<8}")
     for algo, data in analysis.items():
-        print(f"{algo:<10} ${data['mean']:,.2f} ±{data['std']:.2f}  "
-              f"${data['min']:,.2f}  ${data['max']:,.2f}  {data['success_rate']:.1%}")
+        print(f"{algo:<10}\t${data['mean']:,.2f}\t±{data['std']:.2f}  "
+              f"${data['min']:,.2f}\t${data['max']:,.2f}\t{data['success_rate']:.1%}")
 
     plot_mean_convergence(results, analysis)
     plot_soc_comparison(results)

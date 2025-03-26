@@ -11,7 +11,7 @@ class GWWOA:
         self.max_iter = max_iter
         self.levy_prob = levy_prob
         self.chaos_prob = chaos_prob
-        self.beta = beta
+        self.beta = beta 
         
         # Initialize population with chaotic logistic map for half the population
         self.positions = np.random.uniform(low=self.bounds[:,0], high=self.bounds[:,1], 
@@ -47,7 +47,9 @@ class GWWOA:
     def optimize(self):
         for iter in range(self.max_iter):
             a = 2 - 2 * iter / self.max_iter
-            omega = 0.9 - 0.5 * iter / self.max_iter
+            omega_initial = 0.9
+            omega_final = 0.4
+            omega = omega_initial * (omega_final / omega_initial) ** (iter / self.max_iter)
             
             for i in range(self.pop_size):
                 A = 2 * a * np.random.rand(self.dim) - a
@@ -105,81 +107,6 @@ class GWWOA:
         
         return self.alpha, self.best_fitness
 
-class GWO:
-    def __init__(self, obj_func, dim, bounds, population_size=30, max_iter=100):
-        self.obj_func = obj_func
-        self.dim = dim
-        self.bounds = np.array(bounds)
-        self.pop_size = population_size
-        self.max_iter = max_iter
-        
-        # Initialize population
-        self.positions = np.random.uniform(low=self.bounds[:,0], high=self.bounds[:,1], 
-                                       size=(self.pop_size, self.dim))
-        self.fitness = np.apply_along_axis(self.obj_func, 1, self.positions)
-        self.sort_population()
-        self.alpha = self.positions[0]
-        self.beta = self.positions[1]
-        self.delta = self.positions[2]
-        self.history = [self.fitness[0]]
-    
-    def sort_population(self):
-        idx = np.argsort(self.fitness)
-        self.positions = self.positions[idx]
-        self.fitness = self.fitness[idx]
-    
-    def optimize(self):
-        for iter in range(self.max_iter):
-            a = 2 - 2 * iter / self.max_iter  # a decreases linearly from 2 to 0
-            
-            for i in range(self.pop_size):
-                # Update positions
-                r1 = np.random.rand(self.dim)
-                r2 = np.random.rand(self.dim)
-                
-                A1 = 2 * a * r1 - a
-                C1 = 2 * r2
-                
-                D_alpha = np.abs(C1 * self.alpha - self.positions[i])
-                X1 = self.alpha - A1 * D_alpha
-                
-                r1 = np.random.rand(self.dim)
-                r2 = np.random.rand(self.dim)
-                
-                A2 = 2 * a * r1 - a
-                C2 = 2 * r2
-                
-                D_beta = np.abs(C2 * self.beta - self.positions[i])
-                X2 = self.beta - A2 * D_beta
-                
-                r1 = np.random.rand(self.dim)
-                r2 = np.random.rand(self.dim)
-                
-                A3 = 2 * a * r1 - a
-                C3 = 2 * r2
-                
-                D_delta = np.abs(C3 * self.delta - self.positions[i])
-                X3 = self.delta - A3 * D_delta
-                
-                new_pos = (X1 + X2 + X3) / 3
-                new_pos = np.clip(new_pos, self.bounds[:,0], self.bounds[:,1])
-                
-                # Evaluate new position
-                new_fitness = self.obj_func(new_pos)
-                
-                # Update if improved
-                if new_fitness < self.fitness[i]:
-                    self.positions[i] = new_pos
-                    self.fitness[i] = new_fitness
-            
-            # Update leaders
-            self.sort_population()
-            self.alpha = self.positions[0]
-            self.beta = self.positions[1]
-            self.delta = self.positions[2]
-            self.history.append(self.fitness[0])
-        
-        return self.alpha, self.history
 
 class WOA:
     def __init__(self, obj_func, dim, bounds, population_size=30, max_iter=100):
@@ -353,3 +280,4 @@ class FPA:  # Flower Pollination Algorithm
             self.history.append(self.best_fitness)
         
         return self.best_position, self.history
+
