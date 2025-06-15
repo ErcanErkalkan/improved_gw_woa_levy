@@ -3,10 +3,19 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from scipy.special import gamma
-from sko.GA import GA
+from sko.GA import GA  
 from sko.PSO import PSO
 from gwwo import GWWOA, WOA, HS, FPA
-
+# Niapy’ın alt modüllerinden tek tek import ediyoruz:
+from niapy.algorithms.basic.gwo import GreyWolfOptimizer as GWO
+from niapy.algorithms.basic.cso import CatSwarmOptimization as CPSO
+from niapy.algorithms.basic.hs import HarmonySearch as HS
+from niapy.algorithms.basic.fpa import FlowerPollinationAlgorithm as FPA
+from niapy.algorithms.basic.hho import HarrisHawksOptimization as HHO
+from niapy.algorithms.basic.bfo import BacterialForagingOptimization as BFO
+from niapy.algorithms.basic.fss import FishSchoolSearch as FSS
+from niapy.algorithms.basic.mfo import MothFlameOptimizer as MFO
+# ArcticPuffin ve TikiTaka Niapy içinde yok, stub olarak bırakıyoruz.
 
 class RenewableOptimizer:
     def __init__(self, hours=24, population=30, max_iter=50):
@@ -28,26 +37,28 @@ class RenewableOptimizer:
     def load_data(self, trial_num):
         np.random.seed(trial_num)
         t = np.arange(self.hours)
-        
+
         # Temel veri oluşturma
         base_solar = 50 * np.sin(np.pi*(t-6)/12) + 1
         base_wind = 30 * np.cos(np.pi*(t-12)/6) + 5
         base_demand = 80 + 30 * np.sin(np.pi*(t+6)/12)
         base_price = 0.15 + 0.05 * np.sin(np.pi*(t-8)/12) + 0.05
-        
+
         # Varyasyon ve kesintiler
         variation = 1 + self.data_variation * np.random.randn(self.hours)
-        self.solar_failure = np.random.choice([0,1], 24, p=[0.9,0.1])
-        self.wind_failure = np.random.choice([0,1], 24, p=[0.85,0.15])
-        self.grid_available = np.random.choice([0,1], 24, p=[0.2,0.8])
-        self.emergency_event = np.random.choice([0,1], 24, p=[0.9,0.1])
-        
+        self.solar_failure = np.random.choice([0, 1], 24, p=[0.9, 0.1])
+        self.wind_failure = np.random.choice([0, 1], 24, p=[0.85, 0.15])
+        self.grid_available = np.random.choice([0, 1], 24, p=[0.2, 0.8])
+        self.emergency_event = np.random.choice([0, 1], 24, p=[0.9, 0.1])
+
         # Üretim ve talep
-        self.P_solar = np.clip(base_solar * variation * self.solar_failure, 0, None)
-        self.P_wind = np.clip(base_wind * variation * self.wind_failure, 0, None)
+        self.P_solar = np.clip(base_solar * variation *
+                               self.solar_failure, 0, None)
+        self.P_wind = np.clip(base_wind * variation *
+                              self.wind_failure, 0, None)
         self.P_gen = self.P_solar + self.P_wind
         self.P_demand = base_demand * variation * np.random.normal(1, 0.15, 24)
-        
+
         # Fiyatlandırma ve spike'lar
         self.grid_price = np.clip(base_price * variation, 0.05, None)
         spike_hours = np.random.choice(24, size=4, replace=False)
@@ -60,34 +71,34 @@ class RenewableOptimizer:
         SOC = 0.5
         SOC_history = []
         self.temperature = 25
-        
+
         for t_i in range(self.hours):
             effective_S = S * self.SOC_capacity_decay[t_i]
             P_bess = u[t_i] * effective_S
             P_grid = self.P_demand[t_i] - self.P_gen[t_i] - P_bess
-            
+
             # Acil durum yükü
             if self.emergency_event[t_i]:
                 required_power = self.P_demand[t_i] * 1.5
                 shortage = max(0, required_power - (self.P_gen[t_i] + P_bess))
                 total_cost += shortage * 1000
-            
+
             # Şebeke kısıtları
             if not self.grid_available[t_i] and P_grid > 0:
                 total_cost += 1e6
-            
+
             # Maliyetler
             grid_cost = P_grid * self.grid_price[t_i] if P_grid > 0 else 0
             degradation = 0.02 * (abs(P_bess)**1.5) * (1 + SOC/0.9)
             carbon_cost = P_grid * 0.487 * 2
             total_cost += grid_cost + degradation + carbon_cost
-            
+
             # Termal model
             delta_temp = abs(P_bess/effective_S)/0.05
             self.temperature += delta_temp
             if self.temperature > 45:
                 total_cost += (self.temperature - 45)**2 * 10
-                
+
             # SOC güncelleme
             if P_bess < 0:
                 delta = (-P_bess * self.charge_eff) / effective_S
@@ -96,21 +107,21 @@ class RenewableOptimizer:
             SOC += delta
             SOC = np.clip(SOC, self.SOC_min, self.SOC_max)
             SOC_history.append(SOC)
-            
+
             # SOC zincirleme kısıt
             if t_i >= 3:
                 avg_soc = np.mean(SOC_history[-3:])
                 if abs(SOC - avg_soc) > 0.2:
                     total_cost += 1e4
-                    
+
         # Verimlilik hedefi
         efficiency = (sum(self.P_gen) + sum(u*S)) / sum(self.P_demand)
         if efficiency < 0.85:
             total_cost += (0.85 - efficiency) * 1e4
-            
+
         # Periyodik maliyet
         total_cost += 100 * abs(np.sin(S*0.01))
-        
+
         return total_cost
 
     def run_gwwoa(self):
@@ -128,7 +139,7 @@ class RenewableOptimizer:
         )
         best_solution, fitness_history = gwwoa.optimize()
         return best_solution, fitness_history
-    
+
     def run_ga(self):
         """Genetic Algorithm implementation"""
         ga = GA(
@@ -139,28 +150,27 @@ class RenewableOptimizer:
             lb=[1] + [-0.5]*24,
             ub=[2000] + [0.5]*24,
         )
-        
+
         # Yakınsama geçmişini kaydetmek için özel sınıf
         class GACallback:
             def __init__(self):
                 self.history = []
-                
+
             def register(self, ga_instance):
                 self.ga_instance = ga_instance
-                
+
             def update(self):
                 self.history.append(self.ga_instance.best_y)
-        
+
         callback = GACallback()
         ga.callback = callback
         best_x, best_y = ga.run()
-        
+
         # Eğer callback history boşsa, final sonucu ekle
         if not callback.history:
             callback.history.append(best_y)
-        
-        return best_x, callback.history
 
+        return best_x, callback.history
 
     def run_pso(self):
         """Particle Swarm Optimization implementation"""
@@ -172,13 +182,13 @@ class RenewableOptimizer:
             lb=[1] + [-0.5]*24,
             ub=[2000] + [0.5]*24,
         )
-        
+
         # PSO için yakınsama geçmişi
         pso_history = []
         for _ in range(self.max_iter):
             pso.run(1)
             pso_history.append(pso.gbest_y)
-            
+
         return pso.gbest_x, pso_history
 
     def run_woa(self):
@@ -193,7 +203,7 @@ class RenewableOptimizer:
         )
         best_solution, fitness_history = woa.optimize()
         return best_solution, fitness_history
-    
+
     def run_hs(self):
         """Harmony Search implementation"""
         bounds = [[1, 2000]] + [[-0.5, 0.5]]*24
@@ -225,13 +235,203 @@ class RenewableOptimizer:
         best_solution, fitness_history = fpa.optimize()
         return best_solution, fitness_history
 
+    def run_gwo(self):
+        """Grey Wolf Optimizer (Niapy)"""
+        def obj_wrapper(x):
+            return self.energy_cost(x)
+
+        lb = [1] + [-0.5]*24
+        ub = [2000] + [0.5]*24
+        # History toplamak için boş bir liste oluştur
+        history = []
+
+        # Callback fonksiyonu: her iterasyonda en iyi uygunluğu history'ye ekler
+        def callback_fitness(best, **kwargs):
+            history.append(best)
+
+        algo = GWO(
+            NP=self.pop_size,
+            nFES=self.pop_size * self.max_iter,
+            Lower=lb,
+            Upper=ub,
+            seed=1
+        )
+        # run metoduna callback argümanı ekledik
+        best_position, best_fitness = algo.run(
+            obj_wrapper, callback=callback_fitness)
+        return best_position, history
+
+    def run_cso(self):
+        """Competitive PSO (CPSO muadili, Niapy altında 'CPSO' değil 'CPSO')"""
+        def obj_wrapper(x):
+            return self.energy_cost(x)
+
+        lb = [1] + [-0.5]*24
+        ub = [2000] + [0.5]*24
+        history = []
+
+        def callback_fitness(best, **kwargs):
+            history.append(best)
+
+        algo = CPSO(
+            NP=self.pop_size,
+            nFES=self.pop_size * self.max_iter,
+            Lower=lb,
+            Upper=ub,
+            seed=1
+        )
+        best_position, best_fitness = algo.run(
+            obj_wrapper, callback=callback_fitness)
+        return best_position, history
+
+    def run_hs_niapy(self):
+        """Harmony Search (Niapy)"""
+        def obj_wrapper(x):
+            return self.energy_cost(x)
+
+        lb = [1] + [-0.5]*24
+        ub = [2000] + [0.5]*24
+        history = []
+
+        def callback_fitness(best, **kwargs):
+            history.append(best)
+
+        algo = HS(
+            NP=self.pop_size,
+            nFES=self.pop_size * self.max_iter,
+            Lower=lb,
+            Upper=ub,
+            seed=1
+        )
+        best_position, best_fitness = algo.run(
+            obj_wrapper, callback=callback_fitness)
+        return best_position, history
+
+    def run_fpa_niapy(self):
+        """Flower Pollination Algorithm (Niapy)"""
+        def obj_wrapper(x):
+            return self.energy_cost(x)
+
+        lb = [1] + [-0.5]*24
+        ub = [2000] + [0.5]*24
+        history = []
+
+        def callback_fitness(best, **kwargs):
+            history.append(best)
+
+        algo = FPA(
+            NP=self.pop_size,
+            nFES=self.pop_size * self.max_iter,
+            Lower=lb,
+            Upper=ub,
+            seed=1
+        )
+        best_position, best_fitness = algo.run(
+            obj_wrapper, callback=callback_fitness)
+        return best_position, history
+
+    def run_hho(self):
+        """Harris Hawks Optimization (Hippopotamus’a yakın)"""
+        def obj_wrapper(x):
+            return self.energy_cost(x)
+
+        lb = [1] + [-0.5]*24
+        ub = [2000] + [0.5]*24
+        history = []
+
+        def callback_fitness(best, **kwargs):
+            history.append(best)
+
+        algo = HHO(
+            NP=self.pop_size,
+            nFES=self.pop_size * self.max_iter,
+            Lower=lb,
+            Upper=ub,
+            seed=1
+        )
+        best_position, best_fitness = algo.run(
+            obj_wrapper, callback=callback_fitness)
+        return best_position, history
+
+    def run_pufferfish(self):
+        """Pufferfish Optimization muadili → Bacterial Foraging (BFO)"""
+        def obj_wrapper(x):
+            return self.energy_cost(x)
+
+        lb = [1] + [-0.5]*24
+        ub = [2000] + [0.5]*24
+        history = []
+
+        def callback_fitness(best, **kwargs):
+            history.append(best)
+
+        algo = BFO(
+            NP=self.pop_size,
+            nFES=self.pop_size * self.max_iter,
+            Lower=lb,
+            Upper=ub,
+            seed=1
+        )
+        best_position, best_fitness = algo.run(
+            obj_wrapper, callback=callback_fitness)
+        return best_position, history
+
+    def run_fss(self):
+        """Fish School Search (FSS) → pufferfish gibi balık temelli optimizasyon"""
+
+        def obj_wrapper(x):
+            return self.energy_cost(x)
+
+        lb = [1] + [-0.5]*24
+        ub = [2000] + [0.5]*24
+        history = []
+
+        def callback_fitness(best, **kwargs):
+            history.append(best)
+
+        algo = FSS(
+            NP=self.pop_size,
+            nFES=self.pop_size * self.max_iter,
+            Lower=lb,
+            Upper=ub,
+            seed=1
+        )
+        best_position, best_fitness = algo.run(
+            obj_wrapper, callback=callback_fitness)
+        return best_position, history
+
+    def run_mfo(self):
+        """Moth‐Flame Optimization (Mayfly’a yakın)"""
+
+        def obj_wrapper(x):
+            return self.energy_cost(x)
+
+        lb = [1] + [-0.5]*24
+        ub = [2000] + [0.5]*24
+        history = []
+
+        def callback_fitness(best, **kwargs):
+            history.append(best)
+
+        algo = MFO(
+            NP=self.pop_size,
+            nFES=self.pop_size * self.max_iter,
+            Lower=lb,
+            Upper=ub,
+            seed=1
+        )
+        best_position, best_fitness = algo.run(
+            obj_wrapper, callback=callback_fitness)
+        return best_position, history
+
+
 def calculate_soc(solution, hours=24):
     """Calculate SOC time series from solution"""
     S = solution[0]
     u = solution[1:]
     SOC = np.zeros(hours)
     SOC[0] = 0.5
-    
+
     for t in range(1, hours):
         P_bess = u[t] * S
         if P_bess < 0:  # Charging
@@ -240,11 +440,12 @@ def calculate_soc(solution, hours=24):
             delta = -P_bess / (0.95 * S)
         SOC[t] = SOC[t-1] + delta
         SOC[t] = np.clip(SOC[t], 0.1, 0.9)
-    
+
     return SOC
 
+
 def plot_convergence(results):
-    plt.figure(figsize=(12,8))
+    plt.figure(figsize=(12, 8))
     for algo, data in results.items():
         plt.plot(data['history'], label=algo)
     plt.title('Algorithm Convergence Comparison')
@@ -254,11 +455,11 @@ def plot_convergence(results):
     plt.grid(True)
     plt.savefig('convergence_comparison.png')
     plt.close()
-    
-    
+
+
 # Analiz ve görselleştirme fonksiyonları
 def plot_convergence(results):
-    plt.figure(figsize=(12,8))
+    plt.figure(figsize=(12, 8))
     for algo, data in results.items():
         if len(data['histories']) > 0:
             plt.plot(np.nanmean(data['histories'], axis=0), label=algo)
@@ -270,23 +471,25 @@ def plot_convergence(results):
     plt.savefig('convergence_comparison.png')
     plt.close()
 
+
 def plot_soc_comparison(results):
     algorithms = list(results.keys())
     num_algorithms = len(algorithms)
-    
-    plt.figure(figsize=(14, 3*num_algorithms))  # Her algoritma için 3 birim yükseklik
-    
+
+    # Her algoritma için 3 birim yükseklik
+    plt.figure(figsize=(14, 3*num_algorithms))
+
     for idx, algo in enumerate(algorithms, 1):
         plt.subplot(num_algorithms, 1, idx)  # n satır, 1 sütun, pozisyon idx
-        
+
         data = results[algo]
         solutions = [s for s in data['solutions'] if s is not None]
-        
+
         if solutions:
             soc = calculate_soc(solutions[-1])  # Son başarılı çözümü al
             plt.plot(soc, color='tab:blue', linewidth=2)
             plt.fill_between(range(len(soc)), soc, alpha=0.2, color='tab:blue')
-            
+
             # Grafik düzenlemeleri
             plt.title(f'{algo} - State of Charge', fontsize=12, pad=10)
             plt.xlabel('Hour', fontsize=10)
@@ -294,29 +497,30 @@ def plot_soc_comparison(results):
             plt.grid(True, linestyle='--', alpha=0.7)
             plt.xticks(range(0, 24, 2))
             plt.ylim(0, 1)
-            
+
         else:
-            plt.text(0.5, 0.5, 'No Valid Solution', 
-                    ha='center', va='center', 
-                    transform=plt.gca().transAxes,
-                    color='red', fontsize=12)
+            plt.text(0.5, 0.5, 'No Valid Solution',
+                     ha='center', va='center',
+                     transform=plt.gca().transAxes,
+                     color='red', fontsize=12)
             plt.axis('off')
-    
+
     plt.tight_layout(pad=3.0)
     plt.savefig('soc_comparison_subplots.png', dpi=300, bbox_inches='tight')
     plt.close()
 
+
 def population_sensitivity():
     populations = [20, 30, 50, 70]
     results = {}
-    
+
     for pop in populations:
         optimizer = RenewableOptimizer(population=pop)
         optimizer.load_data(0)  # Load data with trial=0
         _, cost_history = optimizer.run_gwwoa()
         results[pop] = cost_history[-1]
-    
-    plt.figure(figsize=(10,6))
+
+    plt.figure(figsize=(10, 6))
     plt.plot(list(results.keys()), list(results.values()), 'bo-')
     plt.title('Population Size Sensitivity')
     plt.xlabel('Population Size')
@@ -325,14 +529,16 @@ def population_sensitivity():
     plt.savefig('population_sensitivity.png')
     plt.close()
 
+
 def run_multiple_trials(optimizer_class, algorithms, num_trials=100):
-    results = {name: {'costs': [], 'histories': [], 'solutions': []} for name in algorithms.keys()}
-    
+    results = {name: {'costs': [], 'histories': [], 'solutions': []}
+               for name in algorithms.keys()}
+
     for trial in range(num_trials):
         print(f"\nTrial {trial+1}/{num_trials}")
         optimizer = optimizer_class()  # Create a new instance for each trial
         optimizer.load_data(trial)      # Load data for this trial
-        
+
         trial_results = {}
         for name, method_name in algorithms.items():
             try:
@@ -346,23 +552,25 @@ def run_multiple_trials(optimizer_class, algorithms, num_trials=100):
                 }
             except Exception as e:
                 print(f"{name} failed: {str(e)}")
-                trial_results[name] = {'cost': np.inf, 'history': [], 'solution': None}
-        
+                trial_results[name] = {'cost': np.inf,
+                                       'history': [], 'solution': None}
+
         for name, data in trial_results.items():
             results[name]['costs'].append(data['cost'])
             results[name]['histories'].append(data['history'])
             results[name]['solutions'].append(data['solution'])
-    
+
     return results
+
 
 def analyze_results(results):
     """Sonuçların istatistiksel analizi"""
     analysis = {}
-    
+
     for algo, data in results.items():
         costs = np.array(data['costs'])
         valid_trials = costs[np.isfinite(costs)]
-        
+
         if len(valid_trials) == 0:
             analysis[algo] = {
                 'mean': np.nan,
@@ -372,7 +580,7 @@ def analyze_results(results):
                 'success_rate': 0.0
             }
             continue
-        
+
         analysis[algo] = {
             'mean': np.mean(valid_trials),
             'std': np.std(valid_trials),
@@ -380,30 +588,32 @@ def analyze_results(results):
             'max': np.max(valid_trials),
             'success_rate': len(valid_trials)/len(costs)
         }
-    
+
     return analysis
+
 
 def plot_mean_convergence(results, analysis):
     """Ortalama yakınsama eğrilerini çizdirme"""
-    plt.figure(figsize=(12,8))
-    
+    plt.figure(figsize=(12, 8))
+
     for algo, data in results.items():
         if analysis[algo]['success_rate'] == 0:
             continue
-        
+
         # Tarihçeleri aynı uzunluğa getirme
         max_length = max(len(h) for h in data['histories'])
-        padded_histories = [h + [h[-1]]*(max_length-len(h)) for h in data['histories']]
-        
+        padded_histories = [h + [h[-1]]*(max_length-len(h))
+                            for h in data['histories']]
+
         mean_history = np.nanmean(padded_histories, axis=0)
         std_history = np.nanstd(padded_histories, axis=0)
-        
+
         plt.plot(mean_history, label=algo)
-        plt.fill_between(range(max_length), 
-                         mean_history - std_history, 
-                         mean_history + std_history, 
+        plt.fill_between(range(max_length),
+                         mean_history - std_history,
+                         mean_history + std_history,
                          alpha=0.2)
-    
+
     plt.title('Average Convergence Trends (100 Trials)')
     plt.xlabel('Iteration')
     plt.ylabel('Mean Cost ($)')
@@ -412,19 +622,28 @@ def plot_mean_convergence(results, analysis):
     plt.savefig('average_convergence.png')
     plt.close()
 
+
 # Çalıştırma ve sonuç analizi
 if __name__ == "__main__":
     algorithms = {
         "GWWOA": "run_gwwoa",
-        "WOA": "run_woa", 
+        "WOA": "run_woa",
+        "GWO": "run_gwo",
         "CPSO": "run_pso",
         "HS": "run_hs",
         "FPA": "run_fpa",
+        "HS (Niapy)": "run_hs_niapy",
+        "FPA (Niapy)": "run_fpa_niapy",
+        "Mayfly (MFO)": "run_mfo",
+        "Pufferfish": "run_pufferfish",     # BFO
+        "FishSchool": "run_fss",            # FSS
+        "Hippopotamus": "run_hho",            # HHO
     }
 
-    results = run_multiple_trials(RenewableOptimizer, algorithms, num_trials=100)
+    results = run_multiple_trials(
+        RenewableOptimizer, algorithms, num_trials=100)
     analysis = analyze_results(results)
-    
+
     print("\n=== Final Performance Summary ===")
     print(f"{'Algorithm':<10}\t{'Mean':<12}\t{'Std':<10}\t{'Min':<12}\t{'Max':<12}\t{'Success':<8}")
     for algo, data in analysis.items():
@@ -434,5 +653,3 @@ if __name__ == "__main__":
     plot_mean_convergence(results, analysis)
     plot_soc_comparison(results)
     population_sensitivity()
-
-
