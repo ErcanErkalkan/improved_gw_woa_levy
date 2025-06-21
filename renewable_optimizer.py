@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from scipy.special import gamma
 from algorithms import GA, GWWOA, WOA, HS, FPA, PSO, GWO, CSO, HHO, BFO, FSS, MFO
+from algorithms import MayflyAlgorithm, PFA, HOA, APO, TTA, CPSO
 
 
 class RenewableOptimizer:
@@ -363,8 +364,85 @@ class RenewableOptimizer:
         # Optimize et ve sonuçları al
         best_x, history = mfo.optimize()
         return best_x, history
-
-
+    
+    def run_pfa(self):
+        bounds = [[1, 2000]] + [[-0.5, 0.5]] * 24
+        algo = PFA(
+            obj_func=lambda x: self.energy_cost(x),
+            dim=25,
+            bounds=bounds,
+            population_size=self.pop_size,
+            max_iter=self.max_iter
+        )
+        best_solution, fitness_history = algo.optimize()
+        return best_solution, fitness_history
+    
+    def run_hoa(self):
+        bounds = [[1, 2000]] + [[-0.5, 0.5]] * 24
+        algo = HOA(
+            obj_func=lambda x: self.energy_cost(x),
+            dim=25,
+            bounds=bounds,
+            population_size=self.pop_size,
+            max_iter=self.max_iter
+        )
+        best_solution, fitness_history = algo.optimize()
+        return best_solution, fitness_history
+    
+    def run_apo(self):
+        bounds = [[1, 2000]] + [[-0.5, 0.5]] * 24
+        algo = APO(
+            obj_func=lambda x: self.energy_cost(x),
+            dim=25,
+            bounds=bounds,
+            population_size=self.pop_size,
+            max_iter=self.max_iter
+        )
+        best_solution, fitness_history = algo.optimize()
+        return best_solution, fitness_history
+    
+    def run_tta(self):
+        bounds = [[1, 2000]] + [[-0.5, 0.5]] * 24
+        algo = TTA(
+            obj_func=lambda x: self.energy_cost(x),
+            dim=25,
+            bounds=bounds,
+            population_size=self.pop_size,
+            max_iter=self.max_iter
+        )
+        best_solution, fitness_history = algo.optimize()
+        return best_solution, fitness_history
+    
+    def run_mayfly(self):
+        bounds = [[1, 2000]] + [[-0.5, 0.5]] * 24
+        algo = MayflyAlgorithm(
+            obj_func=lambda x: self.energy_cost(x),
+            dim=25,
+            bounds=bounds,
+            population_size=self.pop_size,
+            max_iter=self.max_iter
+        )
+        best_solution, fitness_history = algo.optimize()
+        return best_solution, fitness_history
+        
+    def run_cpso(self):
+        bounds = [[1, 2000]] + [[-0.5, 0.5]] * 24
+        # Burada basit constraint: S>0, tüm u in [-0.5, 0.5] kalmalı
+        constraints = [
+            lambda x: x[0] > 0,            # Battery capacity
+            lambda x: np.all(x[1:] >= -0.5),
+            lambda x: np.all(x[1:] <= 0.5)
+        ]
+        algo = CPSO(
+            obj_func=lambda x: self.energy_cost(x),
+            dim=25,
+            bounds=bounds,
+            constraints=constraints,
+            population_size=self.pop_size,
+            max_iter=self.max_iter
+        )
+        best_solution, fitness_history = algo.optimize()
+        return best_solution, fitness_history
 
 def calculate_soc(solution, hours=24):
     """Calculate SOC time series from solution"""
@@ -582,15 +660,13 @@ if __name__ == "__main__":
         "WOA": "run_woa",
         "HS": "run_hs",
         "FPA": "run_fpa",
-        "PSO": "run_pso",
-        "GWO": "run_gwo",
-        "CSO": "run_cso",
-        "HHO": "run_hho",
-        "BFO": "run_bfo",        
-        "FSS": "run_fss",
-        "MFO": "run_mfo"              
+        "Mayfly": "run_mayfly",
+        "PFA": "run_pfa",
+        "HOA": "run_hoa",
+        "APO": "run_apo",
+        "TTA": "run_tta",
+        "CPSO": "run_cpso"
     }
-
     results = run_multiple_trials(RenewableOptimizer, algorithms, num_trials=100)
     analysis = analyze_results(results)
 

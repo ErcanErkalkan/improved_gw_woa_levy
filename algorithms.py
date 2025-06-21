@@ -628,3 +628,246 @@ class MFO:
             self.history.append(self.fits[0])
         return self.moths[0], self.history
 
+class MayflyAlgorithm:
+    def __init__(self, obj_func, dim, bounds, population_size=40, max_iter=100, alpha=0.5, beta=0.5, delta=0.1, gamma=1.0):
+        self.obj_func = obj_func
+        self.dim = dim
+        self.bounds = np.array(bounds)
+        self.pop_size = population_size
+        self.max_iter = max_iter
+        self.alpha = alpha
+        self.beta = beta
+        self.delta = delta
+        self.gamma = gamma
+        self.male = np.random.uniform(self.bounds[:,0], self.bounds[:,1], (self.pop_size//2, self.dim))
+        self.female = np.random.uniform(self.bounds[:,0], self.bounds[:,1], (self.pop_size//2, self.dim))
+        self.male_v = np.zeros_like(self.male)
+        self.female_v = np.zeros_like(self.female)
+        self.male_f = np.apply_along_axis(self.obj_func, 1, self.male)
+        self.female_f = np.apply_along_axis(self.obj_func, 1, self.female)
+        self.best = self.male[np.argmin(self.male_f)]
+        self.best_f = np.min(self.male_f)
+        self.history = [self.best_f]
+    def optimize(self):
+        for t in range(self.max_iter):
+            # update male velocities & positions
+            for i in range(len(self.male)):
+                attract = self.alpha * (self.best - self.male[i])
+                self.male_v[i] = self.beta * self.male_v[i] + attract + self.delta * np.random.randn(self.dim)
+                self.male[i] = np.clip(self.male[i] + self.male_v[i], self.bounds[:,0], self.bounds[:,1])
+            self.male_f = np.apply_along_axis(self.obj_func, 1, self.male)
+            # update female velocities & positions
+            male_best = self.male[np.argmin(self.male_f)]
+            for i in range(len(self.female)):
+                attract = self.gamma * (male_best - self.female[i])
+                self.female_v[i] = self.beta * self.female_v[i] + attract + self.delta * np.random.randn(self.dim)
+                self.female[i] = np.clip(self.female[i] + self.female_v[i], self.bounds[:,0], self.bounds[:,1])
+            self.female_f = np.apply_along_axis(self.obj_func, 1, self.female)
+            # mating (crossover)
+            idx_m = np.argsort(self.male_f)
+            idx_f = np.argsort(self.female_f)
+            for i in range(len(self.male)):
+                if np.random.rand() < 0.3:
+                    cross = np.random.randint(1, self.dim)
+                    child = np.concatenate([self.male[idx_m[i], :cross], self.female[idx_f[i], cross:]])
+                    child = np.clip(child, self.bounds[:,0], self.bounds[:,1])
+                    if self.obj_func(child) < self.male_f[idx_m[-1]]:
+                        self.male[idx_m[-1]] = child
+                        self.male_f[idx_m[-1]] = self.obj_func(child)
+            self.best = self.male[np.argmin(self.male_f)]
+            self.best_f = np.min(self.male_f)
+            self.history.append(self.best_f)
+        return self.best, self.history
+
+#-----------------Pufferfish Optimization Algorithm (PFA)-------------------------------------
+class PFA:
+    def __init__(self, obj_func, dim, bounds, population_size=30, max_iter=100, a=0.2, b=1.5, c=1.5):
+        self.obj_func = obj_func
+        self.dim = dim
+        self.bounds = np.array(bounds)
+        self.pop_size = population_size
+        self.max_iter = max_iter
+        self.a = a
+        self.b = b
+        self.c = c
+        self.positions = np.random.uniform(self.bounds[:,0], self.bounds[:,1], (self.pop_size, self.dim))
+        self.fitness = np.apply_along_axis(self.obj_func, 1, self.positions)
+        self.best_idx = np.argmin(self.fitness)
+        self.best = self.positions[self.best_idx]
+        self.best_f = self.fitness[self.best_idx]
+        self.history = [self.best_f]
+    def optimize(self):
+        for t in range(self.max_iter):
+            for i in range(self.pop_size):
+                rand_idx = np.random.randint(self.pop_size)
+                rand = self.positions[rand_idx]
+                R = np.random.rand(self.dim)
+                F = self.a * (self.best - self.positions[i]) + self.b * (rand - self.positions[i])
+                if np.random.rand() < 0.5:
+                    new_pos = self.positions[i] + F + self.c * R
+                else:
+                    new_pos = self.positions[i] - F + self.c * R
+                new_pos = np.clip(new_pos, self.bounds[:,0], self.bounds[:,1])
+                new_fit = self.obj_func(new_pos)
+                if new_fit < self.fitness[i]:
+                    self.positions[i] = new_pos
+                    self.fitness[i] = new_fit
+            idx = np.argmin(self.fitness)
+            if self.fitness[idx] < self.best_f:
+                self.best = self.positions[idx]
+                self.best_f = self.fitness[idx]
+            self.history.append(self.best_f)
+        return self.best, self.history
+
+#-----------------------Hippopotamus Optimization Algorithm (HOA)-------------------------------------
+class HOA:
+    def __init__(self, obj_func, dim, bounds, population_size=30, max_iter=100):
+        self.obj_func = obj_func
+        self.dim = dim
+        self.bounds = np.array(bounds)
+        self.pop_size = population_size
+        self.max_iter = max_iter
+        self.positions = np.random.uniform(self.bounds[:,0], self.bounds[:,1], (self.pop_size, self.dim))
+        self.fitness = np.apply_along_axis(self.obj_func, 1, self.positions)
+        self.best_idx = np.argmin(self.fitness)
+        self.best = self.positions[self.best_idx]
+        self.best_f = self.fitness[self.best_idx]
+        self.history = [self.best_f]
+    def optimize(self):
+        for t in range(self.max_iter):
+            for i in range(self.pop_size):
+                r = np.random.rand()
+                if r < 0.5:
+                    # grazing
+                    new_pos = self.positions[i] + r * (self.best - self.positions[i]) + 0.01 * np.random.randn(self.dim)
+                else:
+                    # searching
+                    rand_idx = np.random.randint(self.pop_size)
+                    new_pos = self.positions[i] + r * (self.positions[rand_idx] - self.positions[i]) + 0.01 * np.random.randn(self.dim)
+                new_pos = np.clip(new_pos, self.bounds[:,0], self.bounds[:,1])
+                new_fit = self.obj_func(new_pos)
+                if new_fit < self.fitness[i]:
+                    self.positions[i] = new_pos
+                    self.fitness[i] = new_fit
+            idx = np.argmin(self.fitness)
+            if self.fitness[idx] < self.best_f:
+                self.best = self.positions[idx]
+                self.best_f = self.fitness[idx]
+            self.history.append(self.best_f)
+        return self.best, self.history
+#---------------------Arctic Puffin Optimization (APO)---------------------------
+class APO:
+    def __init__(self, obj_func, dim, bounds, population_size=30, max_iter=100, alpha=1.5, beta=0.1):
+        self.obj_func = obj_func
+        self.dim = dim
+        self.bounds = np.array(bounds)
+        self.pop_size = population_size
+        self.max_iter = max_iter
+        self.alpha = alpha
+        self.beta = beta
+        self.positions = np.random.uniform(self.bounds[:,0], self.bounds[:,1], (self.pop_size, self.dim))
+        self.fitness = np.apply_along_axis(self.obj_func, 1, self.positions)
+        self.best_idx = np.argmin(self.fitness)
+        self.best = self.positions[self.best_idx]
+        self.best_f = self.fitness[self.best_idx]
+        self.history = [self.best_f]
+    def optimize(self):
+        for t in range(self.max_iter):
+            for i in range(self.pop_size):
+                r = np.random.rand(self.dim)
+                move = self.alpha * r * (self.best - self.positions[i]) + self.beta * np.random.randn(self.dim)
+                new_pos = self.positions[i] + move
+                new_pos = np.clip(new_pos, self.bounds[:,0], self.bounds[:,1])
+                new_fit = self.obj_func(new_pos)
+                if new_fit < self.fitness[i]:
+                    self.positions[i] = new_pos
+                    self.fitness[i] = new_fit
+            idx = np.argmin(self.fitness)
+            if self.fitness[idx] < self.best_f:
+                self.best = self.positions[idx]
+                self.best_f = self.fitness[idx]
+            self.history.append(self.best_f)
+        return self.best, self.history
+    
+#-----------------------Tiki-Taka Algorithm (TTA)-----------------------------------------
+class TTA:
+    def __init__(self, obj_func, dim, bounds, population_size=30, max_iter=100):
+        self.obj_func = obj_func
+        self.dim = dim
+        self.bounds = np.array(bounds)
+        self.pop_size = population_size
+        self.max_iter = max_iter
+        self.positions = np.random.uniform(self.bounds[:,0], self.bounds[:,1], (self.pop_size, self.dim))
+        self.fitness = np.apply_along_axis(self.obj_func, 1, self.positions)
+        self.best_idx = np.argmin(self.fitness)
+        self.best = self.positions[self.best_idx]
+        self.best_f = self.fitness[self.best_idx]
+        self.history = [self.best_f]
+    def optimize(self):
+        for t in range(self.max_iter):
+            for i in range(self.pop_size):
+                teammate = self.positions[np.random.randint(self.pop_size)]
+                pass_vector = (teammate - self.positions[i]) * np.random.rand()
+                shot_vector = (self.best - self.positions[i]) * np.random.rand()
+                move = pass_vector + shot_vector + 0.01 * np.random.randn(self.dim)
+                new_pos = self.positions[i] + move
+                new_pos = np.clip(new_pos, self.bounds[:,0], self.bounds[:,1])
+                new_fit = self.obj_func(new_pos)
+                if new_fit < self.fitness[i]:
+                    self.positions[i] = new_pos
+                    self.fitness[i] = new_fit
+            idx = np.argmin(self.fitness)
+            if self.fitness[idx] < self.best_f:
+                self.best = self.positions[idx]
+                self.best_f = self.fitness[idx]
+            self.history.append(self.best_f)
+        return self.best, self.history
+
+#-----------------------Constrained Particle Swarm Optimization (CPSO)--------------------------------
+class CPSO:
+    def __init__(self, obj_func, dim, bounds, constraints, penalty=1e6,
+                 population_size=50, max_iter=100, inertia=0.7, c1=1.5, c2=1.5):
+        self.obj_func = obj_func
+        self.constraints = constraints  # list of constraint functions, each returns True if feasible
+        self.penalty = penalty
+        self.dim = dim
+        self.bounds = np.array(bounds)
+        self.pop_size = population_size
+        self.max_iter = max_iter
+        self.w = inertia
+        self.c1 = c1
+        self.c2 = c2
+        self.positions = np.random.uniform(self.bounds[:,0], self.bounds[:,1],
+                                           size=(self.pop_size, self.dim))
+        v_range = self.bounds[:,1] - self.bounds[:,0]
+        self.velocities = np.random.uniform(-v_range, v_range,
+                                            size=(self.pop_size, self.dim))
+        self.pbest_pos = self.positions.copy()
+        self.pbest_val = np.apply_along_axis(self._penalized_obj, 1, self.positions)
+        gidx = np.argmin(self.pbest_val)
+        self.gbest_pos = self.pbest_pos[gidx].copy()
+        self.gbest_val = self.pbest_val[gidx]
+        self.history = [self.gbest_val]
+    def _penalized_obj(self, x):
+        if all(con(x) for con in self.constraints):
+            return self.obj_func(x)
+        else:
+            return self.obj_func(x) + self.penalty
+    def optimize(self):
+        for _ in range(self.max_iter):
+            r1, r2 = np.random.rand(self.pop_size, self.dim), np.random.rand(self.pop_size, self.dim)
+            self.velocities = (self.w*self.velocities 
+                               + self.c1*r1*(self.pbest_pos - self.positions)
+                               + self.c2*r2*(self.gbest_pos - self.positions))
+            self.positions += self.velocities
+            self.positions = clip_positions(self.positions, self.bounds)
+            fitness = np.apply_along_axis(self._penalized_obj, 1, self.positions)
+            mask = fitness < self.pbest_val
+            self.pbest_pos[mask] = self.positions[mask]
+            self.pbest_val[mask] = fitness[mask]
+            gidx = np.argmin(self.pbest_val)
+            if self.pbest_val[gidx] < self.gbest_val:
+                self.gbest_val = self.pbest_val[gidx]
+                self.gbest_pos = self.pbest_pos[gidx].copy()
+            self.history.append(self.gbest_val)
+        return self.gbest_pos, self.history
