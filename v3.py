@@ -113,7 +113,7 @@ for l in levy_vals:
         results.append({'levy':l, 'chaos':c, 'mean_cost':np.mean(costs)})
 # DataFrame and bar chart
 sweep_df = pd.DataFrame(results)
-sweep_pivot = sweep_df.pivot('levy','chaos','mean_cost')
+sweep_pivot = sweep_pivot = sweep_df.pivot(index='levy', columns='chaos', values='mean_cost')
 sweep_pivot.plot(kind='bar', figsize=(8,5))
 plt.title('Param Sweep: Mean Cost')
 plt.ylabel('Cost ($)')
