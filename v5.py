@@ -150,8 +150,8 @@ if __name__=='__main__':
     algos = {
         'GA':'run_ga','GWO':'run_gwo','GW-WOA':'run_gwwoa','WOA':'run_woa',
         'HS':'run_hs','FPA':'run_fpa','PSO':'run_pso','CSO':'run_cso',
-        'HHO':'run_hho','BFO':'run_bfo','FSS':'run_fss','MFO':'run_mfo',
-        'Mayfly':'run_mayfly','PFA':'run_pfa','HOA':'run_hoa','APO':'run_apo','TTA':'run_tta','CPSO':'run_cpso'
+        'BFO':'run_bfo','FSS':'run_fss','Mayfly':'run_mayfly','PFA':'run_pfa',
+        'HOA':'run_hoa','APO':'run_apo','TTA':'run_tta','CPSO':'run_cpso'
     }
     results={a:{'costs':[],'histories':[],'solutions':[]} for a in algos}
     for t in range(100):
@@ -171,6 +171,7 @@ if __name__=='__main__':
     print('Final Performance Summary:')
     for a,v in analysis.items(): print(f"{a}: mean={v['mean']:.1f}, std={v['std']:.1f}, min={v['min']:.1f}, max={v['max']:.1f}, success={v['success_rate']:.0%}")
     plot_mean_convergence(results,analysis)
-    groups={'Group1':['GA','GWO','GW-WOA','WOA'],'Group2':['HS','FPA','PSO','CSO'],'Group3':['HHO','BFO','FSS','MFO'],'Group4':['Mayfly','PFA','HOA','APO','TTA','CPSO']}
+    groups={'Group1':['GA','GWO','GW-WOA','WOA'],'Group2':['HS','FPA','PSO','CSO'],'Group3':['BFO','FSS', 'Mayfly', 'PFA'],'Group4':['HOA','APO','TTA','CPSO']}
     plot_soc_groups(results,groups)
     plot_population_sensitivity(best_levy,best_chaos)
+  
