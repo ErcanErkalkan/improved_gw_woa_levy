@@ -1,0 +1,2 @@
+inherit: configs/main.yaml
+algorithms: [GWO, GW-WOA-base, GW-WOA-Levy, EGW-WOA]

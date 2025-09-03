@@ -1,0 +1,12 @@
+seed: 123
+T_hor: 24
+population_size: 30
+T_iter: 50
+algorithms: [EGW-WOA, GWO, WOA]
+egwwoa:
+  p_levy: 0.25
+  beta_L: 1.5
+  b_spiral: 1.0
+  I_stall: 10
+  phi: 0.2
+  omega: {max: 1.0, min: 0.1, schedule: cosine}

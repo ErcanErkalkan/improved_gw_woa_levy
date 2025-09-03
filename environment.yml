@@ -1,0 +1,15 @@
+name: egw-woa
+channels: [conda-forge]
+dependencies:
+  - python=3.11
+  - numpy
+  - scipy
+  - pandas
+  - pyyaml
+  - matplotlib
+  - scikit-learn
+  - tqdm
+  - pip
+  - pip:
+      - tabulate
+      - colorlog
